@@ -26,6 +26,7 @@ class ResNet50(nn.Module):
 
 class MyNet(nn.Module):
     def __init__(self, output_dim):
+        super(MyNet, self).__init__()
         self.resnet = ResNet50()
         self.avg_pool = nn.AdaptiveAvgPool2d((1,1)) ## average pooling
         self.head = nn.Sequential(

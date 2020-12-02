@@ -6,8 +6,15 @@ import torch.nn.functional as F
 
 import argparse
 from mynet import MyNet, SeqDataset
+from torch.utils.data import DataLoader
+
 
 def main(config, resume):
+
+    # parameters
+
+
+
     ## cuda or cpu
     if config['n_gpu'] == 0 or not torch.cuda.is_available():
         device = torch.device("cpu")
@@ -15,7 +22,7 @@ def main(config, resume):
         device = torch.device("cuda:0")
     
     ## dataloader
-    dataset = SeqDataset(root=config['root'], phase='training')
+    dataset = SeqDataset(phase='train')
     bs = config['batch_size']
     data_loader = DataLoader(
         dataset,
@@ -24,12 +31,12 @@ def main(config, resume):
         shuffle=True,
         drop_last=True,
         pin_memory=True,
-        **loader_kwargs,
+        # **loader_kwargs,
     )
 
     ## CNN model
     output_dim = 6
-    model = MyModel(output_dim)
+    model = MyNet(output_dim)
     model.train()
     model = model.to(device)
 
@@ -38,8 +45,17 @@ def main(config, resume):
 
     ## optimizer
     params = list(filter(lambda p: p.requires_grad, model.parameters()))
-    optimizer = torch.optim.Adam(params, lr=0.001, weight_decay=0)
-    lr_scheduler = torch.optim.lr_scheduler()
+    optim_params={
+        'lr': 0.001,
+        'weight_decay': 0,
+        'amsgrad': False,
+    }
+    optimizer = torch.optim.Adam(params, **optim_params)
+    lr_params = {
+        'milestones':[],
+        'gamma':0.1,
+    }
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,**lr_params)
 
     ## loop
     for epoch in range(start_epoch, max_epoch):
@@ -73,12 +89,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--resume', default=None, type=str,
                         help='path to latest checkpoint (default: None)')
-    parser.add_argument('-b', '--batch_size', default=None, type=int,
+    parser.add_argument('-b', '--batch_size', default=32, type=int,
                         help='the size of each minibatch')
     parser.add_argument('-g', '--n_gpu', default=None, type=int,
                         help='if given, override the numb')
-    parser.add_argument('--root', default=None, type=str,
-                        help='root of the metadata files')
+    parser.add_argument('-e', '--epoch', default=10, type=int,
+                        help='if given, override the numb')
+
     
     # We allow a small number of cmd-line overrides for fast dev
     args = parser.parse_args()
@@ -86,7 +103,10 @@ if __name__ == '__main__':
     config = {}
     config['batch_size'] = args.batch_size
     config['n_gpu'] = args.n_gpu
-    config['root'] = '.' if args.root is None else arg.root
-    
+
+    config['epoch'] = {
+        'start': 0,
+        'max': args.epoch
+    }
 
     main(config, args.resume)

@@ -12,22 +12,27 @@ from PIL import Image
 from utils import *
 
 class SeqDataset(Dataset):
+    phases = ['train', 'val', 'test']
     classes = []
     def __init__(
-        self, root, 
-        phase='training', imwidth=224, 
+        self, phase='train', imwidth=224, 
         do_augmentations=False, img_ext='.png',
-    ):
-        self.root = root
+        ):
+        
+        assert phase in self.phases
+
         self.imwidth = imwidth
         self.phase = phase
         self.train = True if phase != 'testing' else False
         self.data_root = os.path.join('/home/yanglei/codes/WSOL/seq_data', phase)   ## desktop
 
         ## read image paths
-        self.image_paths = read_json(os.path.join(self.root, f'{phase}_images.json'))
+        metafile_path = f'./metadata/{phase}_images.json'
+        self.image_paths = read_json(metafile_path)
 
         ## data pre-processing
+        normalize = transforms.Normalize(mean=[0.5084, 0.4224, 0.3769],
+                                         std=[0.2599, 0.2371, 0.2323])
         augmentations = [
             JPEGNoise(),
             transforms.transforms.ColorJitter(brightness=.1, contrast=.1, saturation=.1, hue=0.01),
@@ -48,4 +53,8 @@ class SeqDataset(Dataset):
         image = self.initial_transforms(image.convert("RGB")) ## to PIL.rgb
         image = TF.pil_to_tensor(image) ## to tensor
         data = self.transforms(TF.to_pil_image(image)) ## to pil for transform
-        return data, image
+
+        print(image_path)
+        label = image_path.split('/')[0]
+
+        return data, image, label
