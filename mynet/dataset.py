@@ -24,7 +24,7 @@ class SeqDataset(Dataset):
         self.imwidth = imwidth
         self.phase = phase
         self.train = True if phase != 'testing' else False
-        self.data_root = os.path.join('/home/yanglei/codes/WSOL/seq_data', phase)   ## desktop
+        self.data_root = os.path.join('/home/yanglei/codes/WSOL/', phase)   ## desktop
 
         ## read image paths
         metafile_path = f'./metadata/{phase}_images.json'
@@ -49,6 +49,7 @@ class SeqDataset(Dataset):
 
 
     def __getitem__(self, index):
+        image_path = self.image_paths[index]
         image = Image.open(os.path.join(self.data_root, image_path))
         image = self.initial_transforms(image.convert("RGB")) ## to PIL.rgb
         image = TF.pil_to_tensor(image) ## to tensor

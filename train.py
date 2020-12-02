@@ -12,6 +12,10 @@ from torch.utils.data import DataLoader
 def main(config, resume):
 
     # parameters
+    batch_size = config.get('batch_size', 32)
+    start_epoch = config['epoch']['start']
+    max_epoch = config['epoch']['max']
+
 
 
 
@@ -23,10 +27,9 @@ def main(config, resume):
     
     ## dataloader
     dataset = SeqDataset(phase='train')
-    bs = config['batch_size']
     data_loader = DataLoader(
         dataset,
-        batch_size=int(bs),
+        batch_size=int(batch_size),
         num_workers=1,
         shuffle=True,
         drop_last=True,
@@ -59,7 +62,7 @@ def main(config, resume):
 
     ## loop
     for epoch in range(start_epoch, max_epoch):
-        for batch_idx, batch in tqdm(enumerate(dataloader)):
+        for batch_idx, batch in tqdm(enumerate(data_loader)):
             data = batch['data'].to(device)
             gt_lbls = batch['gt_label'].to(device)
 

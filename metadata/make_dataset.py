@@ -2,10 +2,10 @@ import numpy as np
 import os,sys,inspect
 import glob
 
-from utils import *
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir) 
+from utils import *
 
 
 
@@ -39,8 +39,8 @@ def make_dataset(root):
 
 
 if __name__ == '__main__':
-    root = '../seq_data'
-    phase = 'test'
+    root = '/home/yanglei/codes/WSOL/seq_data'
+    phase = 'val_hard'
     path = os.path.join(root, phase)
     image_list = make_dataset(path)
 
