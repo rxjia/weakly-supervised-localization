@@ -11,9 +11,16 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from utils import *
 
+import warnings
+warnings.filterwarnings("ignore")
+
+
 class SeqDataset(Dataset):
     phases = ['train', 'val', 'test']
-    classes = []
+    classes_str = ['C', 'H', 'P', 'CP', 'PH', 'HC']
+    classes = {'C': [0], 'H': [1], 'P': [2], 'CP': [0,2], 'PH': [1,2], 'HC': [0,1]}
+    torch.manual_seed(0)
+
     def __init__(
         self, phase='train', imwidth=224, 
         do_augmentations=False, img_ext='.png',
@@ -55,7 +62,11 @@ class SeqDataset(Dataset):
         image = TF.pil_to_tensor(image) ## to tensor
         data = self.transforms(TF.to_pil_image(image)) ## to pil for transform
 
-        print(image_path)
-        label = image_path.split('/')[0]
+        # print(image_path)
+        label = image_path.split('/')[-2]
+        assert label in self.classes
+        n = len(self.classes[label])
+        rand_idx = torch.randperm(n)[0]
+        target = self.classes[label][rand_idx]
 
-        return data, image, label
+        return data, target, self.classes_str.index(label), image

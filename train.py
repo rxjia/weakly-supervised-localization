@@ -4,10 +4,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F 
 
+import os
+from datetime import datetime
 import argparse
 from mynet import MyNet, SeqDataset
 from torch.utils.data import DataLoader
+from utils import AverageMeter, SimpleLossLogger
 
+
+
+def _save_checkpoint(path, epoch, model, optimizer=None):
+    arch = type(model).__name__
+    state = {
+        'arch': arch,
+        'epoch': epoch,
+        'state_dict': model.state_dict(),
+    }
+    if optimizer is not None:
+        state = {**state, 'optimizer': self.optimizer.state_dict()}
+
+    filename = os.path.join(
+        path,
+        'checkpoint-epoch{}.pth'.format(epoch)
+    )
+    torch.save(state, filename, _use_new_zipfile_serialization=False)
+    print("Saving checkpoint: {} ...".format(filename))
+    
 
 def main(config, resume):
 
@@ -16,12 +38,26 @@ def main(config, resume):
     start_epoch = config['epoch']['start']
     max_epoch = config['epoch']['max']
 
+    ## path
+    save_path = config['save_path']
+    timestamp = datetime.now().strftime(r"%Y-%m-%d_%H-%M-%S")
+    save_path = os.path.join(save_path, timestamp)
+
+    result_path = os.path.join(save_path, 'result')
+    if not os.path.exists(result_path):
+        os.makedirs(result_path)
+
+    model_path = os.path.join(save_path, 'model')
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
+
 
 
 
     ## cuda or cpu
     if config['n_gpu'] == 0 or not torch.cuda.is_available():
         device = torch.device("cpu")
+        print("using CPU")
     else:
         device = torch.device("cuda:0")
     
@@ -44,12 +80,12 @@ def main(config, resume):
     model = model.to(device)
 
     ## loss
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(reduction='none')
 
     ## optimizer
     params = list(filter(lambda p: p.requires_grad, model.parameters()))
     optim_params={
-        'lr': 0.001,
+        'lr': 0.0001,
         'weight_decay': 0,
         'amsgrad': False,
     }
@@ -60,34 +96,69 @@ def main(config, resume):
     }
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,**lr_params)
 
+    loss_avg = AverageMeter()
+    loss_logger = SimpleLossLogger()
+
     ## loop
     for epoch in range(start_epoch, max_epoch):
-        for batch_idx, batch in tqdm(enumerate(data_loader)):
-            data = batch['data'].to(device)
-            gt_lbls = batch['gt_label'].to(device)
+        loss_avg.reset()
+
+        for batch_idx, batch in tqdm(
+            enumerate(data_loader), 
+            total=len(data_loader),
+            ncols = 80,
+            desc= f'training epoch {epoch}',
+            ):
+            data = batch[0].to(device)
+            gt_lbls = batch[1].to(device)
+            gt_gt_lbls = batch[-1].to(device)
+
 
             ## set zerograd
             optimizer.zero_grad()
 
             ## run forward pass
-            logits, conf = model(data) ## logits: [B, NC]; conf: [B, 1] 
+            out = model(data) ## logits: [B, NC]; conf: [B, 1] 
+            # print("out shape: ", out.shape)
             
+            weights = model.compute_entropy_weight(out)
+            # print("weights shape: ", weights.shape)
+
             ## compute loss
-            class_loss = criterion(logits, gt_lbls, reduction='none') ## [B, 1]
-            loss = (conf * class_loss).sum()
+            class_loss = criterion(out, gt_lbls) ## [B, 1]
+            # print("class_loss shape: ", class_loss.shape)
+
+            # if batch_idx == 0:
+            #     print("weights: ", weights)
+            #     print("class loss: ", class_loss)
+            #     print("gt_gt_lbls: ", gt_gt_lbls)
+            #     print("gt_labels: ", gt_lbls)
+            #     print("preds: ", torch.max(out, dim=-1)[1])
+
+            # loss = class_loss * (weights**2) + (1-weights)**2
+            loss = class_loss.mean()
+
+            loss_avg.update(loss.item(), batch_size)
 
             ## run backward pass
             loss.backward()
             optimizer.step() ## update
 
         ## each epoch
+        print("training loss: ", loss_avg.avg)
+        loss_logger.update(loss_avg.avg)
+
+        best_idx = loss_logger.get_best()
+        if best_idx == epoch:
+            print('save ckpt')
+            ## save ckpt
+            _save_checkpoint(model_path, epoch, model)
+
         lr_scheduler.step()
 
 
 
-
-
-
+##
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--resume', default=None, type=str,
@@ -98,6 +169,8 @@ if __name__ == '__main__':
                         help='if given, override the numb')
     parser.add_argument('-e', '--epoch', default=10, type=int,
                         help='if given, override the numb')
+    parser.add_argument('-s', '--save_path', default='saved', type=str,
+                        help='path to save')
 
     
     # We allow a small number of cmd-line overrides for fast dev
@@ -106,7 +179,7 @@ if __name__ == '__main__':
     config = {}
     config['batch_size'] = args.batch_size
     config['n_gpu'] = args.n_gpu
-
+    config['save_path'] = args.save_path
     config['epoch'] = {
         'start': 0,
         'max': args.epoch
