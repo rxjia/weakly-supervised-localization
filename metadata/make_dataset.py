@@ -40,7 +40,7 @@ def make_dataset(root):
 
 if __name__ == '__main__':
     root = '/home/yanglei/codes/WSOL/seq_data'
-    phase = 'val_hard'
+    phase = 'new_test'
     path = os.path.join(root, phase)
     image_list = make_dataset(path)
     

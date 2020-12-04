@@ -65,7 +65,7 @@ def main(config, resume):
         device = torch.device("cuda:0")
     
     ## dataloader
-    dataset = SeqDataset(phase='train')
+    dataset = SeqDataset(phase='train', do_augmentations=True)
     data_loader = DataLoader(
         dataset,
         batch_size=int(batch_size),
@@ -76,7 +76,7 @@ def main(config, resume):
         # **loader_kwargs,
     )
 
-    val_dataset = SeqDataset(phase='val')
+    val_dataset = SeqDataset(phase='val', do_augmentations=True)
     val_data_loader = DataLoader(
         val_dataset,
         batch_size=int(batch_size),
@@ -209,7 +209,7 @@ if __name__ == '__main__':
         'start': 0,
         'max': args.epoch
     }
-    config['lr'] = 0.001
+    config['lr'] = 0.0001
     config['use_conf']=True
 
     main(config, args.resume)

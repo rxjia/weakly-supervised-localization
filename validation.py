@@ -78,7 +78,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 ## convert to heatmap image
                 cam_numpy = cam.permute(1,2,0).numpy()
                 img_numpy = images[0].permute(1,2,0).numpy()
-                filename = os.path.join(draw_path, f"test_{image_ids[0]}")
+                filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item()}")
                 drawer.draw_heatmap(filename, cam_numpy, img_numpy)
 
             if False:
@@ -92,12 +92,13 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
 
 
 
-def main(resume, use_cuda=False):
+def main(resume, use_cuda=False, use_augment=False):
     ## path
     timestamp = datetime.now().strftime(r"%Y-%m-%d_%H-%M-%S")
     save_path = os.path.join('test_result', timestamp)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+        print('make a test result folder: ', save_path)
 
 
     ## cuda or cpu
@@ -108,9 +109,16 @@ def main(resume, use_cuda=False):
         device = torch.device("cpu")
         print("using CPU")
 
+    if use_augment: 
+        print("data are augmented randomly")
+
 
     ## dataloader
-    dataset = SeqDataset(phase='test')
+    dataset = SeqDataset(
+        phase='test', 
+        do_augmentations=use_augment,
+        metafile_path = './metadata/new_test_images.json')
+        
     data_loader = DataLoader(
         dataset,
         batch_size=1,
@@ -129,8 +137,9 @@ def main(resume, use_cuda=False):
 
 
     ## evaluate
-    evaluate(model, data_loader, device, draw_path=save_path)
-
+    log = evaluate(model, data_loader, device, draw_path=save_path)
+    print("val loss: ", log['loss'])
+    print("val acc: ", log['acc'])
 
 
 
@@ -140,7 +149,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--resume', default=None, type=str,
                         help='path to latest checkpoint (default: None)')
     parser.add_argument('--cuda', action='store_true')
+    parser.add_argument('--augment', action='store_true')
+
     args = parser.parse_args()
 
     assert args.resume is not None, "provide ckpt path to try again"
-    main(args.resume, use_cuda=args.cuda)
+    main(args.resume, use_cuda=args.cuda, use_augment=args.augment)

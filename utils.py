@@ -24,7 +24,6 @@ def write_json_no_indent(content, fname):
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-
     def __init__(self):
         self.reset()
 
@@ -40,8 +39,8 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-class SimpleLogger(object):
 
+class SimpleLogger(object):
     def __init__(self, kwarg_list):
         self.kwarg_list = kwarg_list
         self.content = {}
@@ -60,7 +59,6 @@ class SimpleLogger(object):
             best_val = max(self.content[kwarg])
 
         return self.content[kwarg].index(best_val)
-
 
 
 def normalize_data_to_img255(data):
@@ -95,8 +93,8 @@ def write_text_to_img(img, text):
                 fontScale,
                 fontColor,
                 lineType)
-
     return img
+
 
 class Drawer(object):
     @staticmethod
@@ -108,30 +106,76 @@ class Drawer(object):
         img = 0.5*src + 0.3*heatmap
         cv_write_numpy_to_image(img, path)
 
-    # @staticmethod
-    # def write_video_from_images(images, videoName):
-    #     frame_array = []
-    #     files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
-    #     # for sorting the file names properly
-    #     files.sort(key=lambda x: x[5:-4])
-    #     files.sort()
+    @staticmethod
+    def write_video_from_images(pathIn, videoName):
+        frame_array = []
+        files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
+        # for sorting the file names properly
+        files.sort(key=lambda x: x[5:-4])
+        files.sort()
 
-    #     size = (0, 0)
+        size = (0, 0)
+        img_list = []
+        for filename in files:
+            if filename.split('.')[-1] == 'png':
+                print(filename)
+                img_list.append(filename)
+                img = cv2.imread(os.path.join(pathIn, filename))
+                height, width, layers = img.shape
+                size = (width, height)
+                #text = filename
+                #write_text_to_img(img, text)
+                frame_array.append(img)
+            
 
-    #     for filename in files:
-    #         print(filename)
-    #         img = cv2.imread(  pathIn+"\\"+filename)
-    #         height, width, layers = img.shape
-    #         size = (width, height)
-    #         #text = filename
-    #         #write_text_to_img(img, text)
-    #         frame_array.append(img)
+        print(size)
+        out = cv2.VideoWriter(videoName, cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
+        for i in range(len(frame_array)):
+            out.write(frame_array[i])
 
-    #     print(size)
-    #     out = cv2.VideoWriter(videoName, cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
-    #     for i in range(len(frame_array)):
-    #         out.write(frame_array[i])
+        out.release()
+        print("finishing writing the video")
 
-    #     out.release()
-    #     print("finishing writing the video")
+        if True:
+            for f in img_list:
+                os.remove(os.path.join(pathIn, f))
 
+
+
+def get_frames_from_a_video(vidfile, save_path):
+    """
+    :param vidfile: video file
+    :param segs: video segment list: [(start, end)] (second)
+    :param sample_num: sampling number for each segment. +num: fix sample num. 0: 1 fps. -1: 16 fps
+    """
+    if os.path.exists(vidfile):
+        video = cv2.VideoCapture(vidfile)
+    else:
+        raise IOError
+        
+    reshape_size = (224, 224)
+    
+    fps = video.get(cv2.CAP_PROP_FPS)
+    frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = frame_count/fps
+
+    print('fps = ' + str(fps))
+    print('number of frames = ' + str(frame_count))
+    print('duration (S) = ' + str(duration))
+    minutes = int(duration/60)
+    seconds = duration%60
+    print('duration (M:S) = ' + str(minutes) + ':' + str(seconds))
+
+    # Grab a few frames
+    count = 0
+    while True:
+        ret, frame = video.read()
+        if not ret:
+            break
+        # resize
+        frame = cv2.resize(frame, reshape_size)
+        frame_name = 'new_test'+f'{count:04d}'
+        cv2.imwrite(os.path.join(save_path, frame_name+'.png'), frame)
+        count += 1
+    
+    video.release()
