@@ -43,7 +43,7 @@ if __name__ == '__main__':
     phase = 'val_hard'
     path = os.path.join(root, phase)
     image_list = make_dataset(path)
-
+    
     write_json_no_indent(image_list, f'{phase}_images.json')
 
     

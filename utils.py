@@ -4,6 +4,9 @@ import torch
 import torch.nn.functional as F 
 import cv2
 import numpy as np
+import glob
+import os
+from os.path import isfile, join
 
 ## json file IO
 def read_json(fname):
@@ -37,20 +40,26 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-class SimpleLossLogger(object):
+class SimpleLogger(object):
 
-    def __init__(self):
-        self.reset()
+    def __init__(self, kwarg_list):
+        self.kwarg_list = kwarg_list
+        self.content = {}
+        for kwarg in kwarg_list:
+            self.content[kwarg] = []
 
-    def reset(self):
-        self.loss_list = []
+    def update(self, loss, kwarg):
+        assert kwarg in self.kwarg_list
+        self.content[kwarg].append(loss)
 
-    def update(self, loss):
-        self.loss_list.append(loss)
+    def get_best(self, kwarg, best='min'):
+        assert kwarg in self.kwarg_list
+        if best == 'min':
+            best_val = min(self.content[kwarg])
+        else:
+            best_val = max(self.content[kwarg])
 
-    def get_best(self):
-        max_val = min(self.loss_list)
-        return self.loss_list.index(max_val)
+        return self.content[kwarg].index(best_val)
 
 
 
@@ -71,6 +80,23 @@ def cv_write_numpy_to_image(img, fname, debug=False):
 def resize_image(img, size):
     img_resized = cv2.resize(img, size)
     return img_resized
+    
+def write_text_to_img(img, text):
+    # Write some Text
+    font                   = cv2.FONT_HERSHEY_SIMPLEX
+    bottomLeftCornerOfText = (100, 100)
+    fontScale              = 1
+    fontColor              = (255, 255, 255)
+    lineType               = 2
+
+    cv2.putText(img, text,
+                bottomLeftCornerOfText,
+                font,
+                fontScale,
+                fontColor,
+                lineType)
+
+    return img
 
 class Drawer(object):
     @staticmethod
@@ -82,4 +108,30 @@ class Drawer(object):
         img = 0.5*src + 0.3*heatmap
         cv_write_numpy_to_image(img, path)
 
-    
+    # @staticmethod
+    # def write_video_from_images(images, videoName):
+    #     frame_array = []
+    #     files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
+    #     # for sorting the file names properly
+    #     files.sort(key=lambda x: x[5:-4])
+    #     files.sort()
+
+    #     size = (0, 0)
+
+    #     for filename in files:
+    #         print(filename)
+    #         img = cv2.imread(  pathIn+"\\"+filename)
+    #         height, width, layers = img.shape
+    #         size = (width, height)
+    #         #text = filename
+    #         #write_text_to_img(img, text)
+    #         frame_array.append(img)
+
+    #     print(size)
+    #     out = cv2.VideoWriter(videoName, cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
+    #     for i in range(len(frame_array)):
+    #         out.write(frame_array[i])
+
+    #     out.release()
+    #     print("finishing writing the video")
+

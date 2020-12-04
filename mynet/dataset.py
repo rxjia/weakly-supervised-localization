@@ -9,6 +9,10 @@ import torchvision.transforms.functional as TF
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 from PIL import Image
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir) 
 from utils import *
 
 import warnings
@@ -35,8 +39,10 @@ class SeqDataset(Dataset):
 
         ## read image paths
         metafile_path = f'./metadata/{phase}_images.json'
-        self.image_paths = read_json(metafile_path)
-
+        files = read_json(metafile_path)
+        files.sort(key=lambda x: x[5:-4])
+        self.image_paths = files
+        
         ## data pre-processing
         normalize = transforms.Normalize(mean=[0.5084, 0.4224, 0.3769],
                                          std=[0.2599, 0.2371, 0.2323])
@@ -63,10 +69,20 @@ class SeqDataset(Dataset):
         data = self.transforms(TF.to_pil_image(image)) ## to pil for transform
 
         # print(image_path)
-        label = image_path.split('/')[-2]
+        label, path = image_path.split('/')[-2:]
+        # test0004.png
+        image_id = path.split('.')[0] ## str
         assert label in self.classes
         n = len(self.classes[label])
         rand_idx = torch.randperm(n)[0]
         target = self.classes[label][rand_idx]
 
-        return data, target, self.classes_str.index(label), image
+        return data, target, self.classes_str.index(label), image, image_id
+
+
+
+if __name__ == '__main__':
+    dataset = SeqDataset(phase='test')
+    files = dataset.image_paths
+    files.sort(key=lambda x: x[5:-4])
+    print(files)

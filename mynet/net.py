@@ -14,10 +14,21 @@ def compute_entropy(scores):
 
 
 ## ResNet18
-class ResNet18(nn.Module):
-    def __init__(self):
-        super(ResNet18, self).__init__()        
-        resnet = models.resnet18(pretrained=True)
+class ResNetBase(nn.Module):
+    def __init__(self, resnet_type='resnet18'):
+        super(ResNetBase, self).__init__()    
+        if resnet_type == 'resnet18':
+            resnet = models.resnet18(pretrained=True)
+            self.out_dim = 512
+        elif resnet_type == 'resnet34':
+            resnet = models.resnet34(pretrained=True)
+            self.out_dim = 512
+        elif resnet_type == 'resnet50':
+            resnet = models.resnet50(pretrained=True)
+            self.out_dim = 2048
+        else:
+            raise NotImplementedError
+
         self.features = nn.Sequential(
             resnet.conv1,
             resnet.bn1,
@@ -37,7 +48,9 @@ class MyNet(nn.Module):
     def __init__(self, output_dim):
         super(MyNet, self).__init__()
         self.output_dim = output_dim
-        self.resnet = ResNet18()
+
+        self.resnet = ResNetBase(resnet_type='resnet34')
+        
         self.avg_pool = nn.AdaptiveAvgPool2d((1,1)) ## average pooling
         self.dropout = nn.Dropout(p=0.1)
         self.head = nn.Linear(512, 3)
