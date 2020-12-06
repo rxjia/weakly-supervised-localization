@@ -7,7 +7,9 @@ import torch.nn.functional as F
 import os
 from datetime import datetime
 import argparse
-from mynet import MyNet, SeqDataset
+# from mynet import SeqDataset as Dataset
+from mynet import BgremoveDataset as Dataset
+from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, SimpleLogger
 from validation import evaluate
@@ -65,7 +67,8 @@ def main(config, resume):
         device = torch.device("cuda:0")
     
     ## dataloader
-    dataset = SeqDataset(phase='train', do_augmentations=True)
+    bg_image_path = '/home/yanglei/codes/WSOL/seq_data/background.png'
+    dataset = Dataset(phase='train', bg_image_path=bg_image_path, do_augmentations=False)
     data_loader = DataLoader(
         dataset,
         batch_size=int(batch_size),
@@ -76,7 +79,7 @@ def main(config, resume):
         # **loader_kwargs,
     )
 
-    val_dataset = SeqDataset(phase='val', do_augmentations=True)
+    val_dataset = Dataset(phase='val', bg_image_path=bg_image_path, do_augmentations=False)
     val_data_loader = DataLoader(
         val_dataset,
         batch_size=int(batch_size),
@@ -116,6 +119,7 @@ def main(config, resume):
     logger = SimpleLogger(['train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
     ## loop
+    remove_bg = hasattr(dataset, 'bg_image_path')
     for epoch in range(start_epoch, max_epoch):
         loss_avg.reset()
 
@@ -133,7 +137,10 @@ def main(config, resume):
             optimizer.zero_grad()
 
             ## run forward pass
-            out = model(data) ## logits: [B, NC]; conf: [B, 1] 
+            if remove_bg:
+                out = model.forward_with_bg(data, bg) ## logits: [B, NC]; conf: [B, 1] 
+            else:
+                out = model(data) ## logits: [B, NC]; conf: [B, 1] 
             preds = torch.max(out, dim=-1)[1]
             # print("out shape: ", out.shape)
             

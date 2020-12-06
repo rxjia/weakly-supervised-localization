@@ -71,6 +71,15 @@ class MyNet(nn.Module):
         h = self.avg_pool(x).reshape(B, 512)
         return self.head(h), x
 
+    def forward_with_bg(self, x, bg):
+        B = x.shape[0]
+        x = self.resnet(x)
+        bg = self.resnet(bg)
+        h = x-bg
+        h = self.avg_pool(h).reshape(B, 512)
+        h = self.dropout(h)
+        return self.head(h)
+
     def compute_entropy_weight(self, scores):
         entropy = compute_entropy(scores)
         entropy_weight = 1.0 - entropy/self.max_ent.to(scores.device)

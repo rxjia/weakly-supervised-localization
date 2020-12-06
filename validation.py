@@ -9,7 +9,8 @@ import numpy as np
 import os
 import argparse
 from datetime import datetime
-from mynet import MyNet, SeqDataset
+from mynet import SeqDataset, BgremoveDataset 
+from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, Drawer
 
@@ -51,6 +52,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
             out, feat = model.forward_eval(data) ## out: [B, N]; feat: [B, C, H, W] 
             preds = torch.max(out, dim=-1)[1]
 
+
             ## compute loss
             class_loss = criterion(out, gt_lbls) ## [B, 1]
             if use_conf:
@@ -58,7 +60,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 loss = (class_loss * (weights**2) + (1-weights)**2).mean()
             else:
                 loss = class_loss.mean()
-            
+
             ## record
             loss_avg.update(loss.item(), batch_size)
             positive = ((gt_lbls == preds) + (gt_gt_lbls>2)).sum()
@@ -71,34 +73,37 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 B,C,H,W = feat.shape
                 cam = fc_weights[preds,:].unsqueeze(-1) * feat.reshape(B, C, -1) ## [B, C] * [B, C, H, W]
                 cam = torch.sum(cam, dim=1).reshape(B, H, W)
-                ## normalize the cam
+                ## normalize the cam    
                 max_val = torch.max(cam)
                 min_val = torch.min(cam)
                 cam = (cam - min_val) / (max_val - min_val)
                 ## convert to heatmap image
                 cam_numpy = cam.permute(1,2,0).numpy()
                 img_numpy = images[0].permute(1,2,0).numpy()
-                filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item()}")
+                filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item()}_{weights.item()}")
                 drawer.draw_heatmap(filename, cam_numpy, img_numpy)
-
-            if False:
-                # print("class loss: ", class_loss)
-                print("gt_labels: ", gt_lbls)
-                print("gtgt_lbls: ", gtgt_lbls)
-                print("preds: ", preds)
+     
+            # print(image_ids[0])
+            # print("out: ", out)
+            # print("weights: ", weights)
+            # input()
 
     return {"loss": loss_avg.avg, "acc": acc_avg.avg}
     # print("test loss: ", loss_avg.avg)
 
 
 
-def main(resume, use_cuda=False, use_augment=False):
+def main(resume, use_cuda=False, use_augment=False, remove_bg=False):
+    
     ## path
-    timestamp = datetime.now().strftime(r"%Y-%m-%d_%H-%M-%S")
-    save_path = os.path.join('test_result', timestamp)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-        print('make a test result folder: ', save_path)
+    if True:
+        timestamp = datetime.now().strftime(r"%Y-%m-%d_%H-%M-%S")
+        save_path = os.path.join('test_result', timestamp)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+            print('make a test result folder: ', save_path)
+    else:
+        save_path = None
 
 
     ## cuda or cpu
@@ -114,10 +119,19 @@ def main(resume, use_cuda=False, use_augment=False):
 
 
     ## dataloader
-    dataset = SeqDataset(
-        phase='test', 
-        do_augmentations=use_augment,
-        metafile_path = './metadata/new_test_images.json')
+    if remove_bg:
+        bg_image_path = '/home/yanglei/codes/WSOL/new_seq_data/background.png'
+        dataset = BgremoveDataset(
+            phase='test', 
+            bg_image_path=bg_image_path, 
+            do_augmentations=use_augment,
+            metafile_path = './metadata/new_test_no_resize_images.json')
+    else:
+        dataset = SeqDataset(
+            phase='test', 
+            do_augmentations=use_augment,
+            metafile_path = './metadata/test_images.json')
+
         
     data_loader = DataLoader(
         dataset,
@@ -137,7 +151,7 @@ def main(resume, use_cuda=False, use_augment=False):
 
 
     ## evaluate
-    log = evaluate(model, data_loader, device, draw_path=save_path)
+    log = evaluate(model, data_loader, device, draw_path=save_path, use_conf=True)
     print("val loss: ", log['loss'])
     print("val acc: ", log['acc'])
 
@@ -150,8 +164,9 @@ if __name__ == '__main__':
                         help='path to latest checkpoint (default: None)')
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--augment', action='store_true')
+    parser.add_argument('--remove_bg', action='store_true')
 
     args = parser.parse_args()
 
     assert args.resume is not None, "provide ckpt path to try again"
-    main(args.resume, use_cuda=args.cuda, use_augment=args.augment)
+    main(args.resume, use_cuda=args.cuda, use_augment=args.augment, remove_bg=args.remove_bg)

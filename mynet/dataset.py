@@ -117,6 +117,28 @@ class SeqDataset(Dataset):
 
 
 
+class BgremoveDataset(SeqDataset):
+    def __init__(
+        self, bg_image_path,
+        phase='train', imwidth=224, 
+        metafile_path = None,
+        do_augmentations=False, img_ext='.png',
+        ):
+        super(BgremoveDataset, self).__init__(
+            phase=phase, imwidth=imwidth,
+            metafile_path=metafile_path,
+            do_augmentations=do_augmentations,img_ext=img_ext)
+
+        ## load background image
+        self.bg_image = Image.open(bg_image_path)
+        self.bg_image = self.initial_transforms(self.bg_image.convert("RGB")) ## to PIL.rgb
+        self.bg_image = self.normalize(self.to_tensor(self.bg_image))
+
+    def get_background(self):
+        return self.bg_image
+        
+
+
 if __name__ == '__main__':
     dataset = SeqDataset(phase='test')
     files = dataset.image_paths

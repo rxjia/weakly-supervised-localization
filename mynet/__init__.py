@@ -1,2 +1,2 @@
-from .dataset import SeqDataset
+from .dataset import SeqDataset, BgremoveDataset
 from .net import MyNet
