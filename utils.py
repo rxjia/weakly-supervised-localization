@@ -112,7 +112,7 @@ class Drawer:
         Drawer.cv_write_numpy_to_image(img, path)
         
     @staticmethod
-    def write_video_from_images(pathIn, videoName):
+    def write_video_from_images(pathIn, videoName, deleteImg=True):
         frame_array = []
         files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
         # for sorting the file names properly
@@ -140,7 +140,7 @@ class Drawer:
         out.release()
         print("finishing writing the video")
 
-        if True:
+        if deleteImg:
             for f in img_list:
                 os.remove(os.path.join(pathIn, f))
 

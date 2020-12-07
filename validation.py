@@ -119,8 +119,8 @@ def main(resume, use_cuda=False, use_augment=False):
 
 
     ## dataloader
-    test_path = './metadata/test_images.json'
-    new_test_path = './metadata/new_new_seq_data_images.json'
+    # test_path = './metadata/test_images.json'
+    new_test_path = './metadata/new_test_images.json'
     dataset = SeqDataset(
         phase='test', 
         do_augmentations=use_augment,

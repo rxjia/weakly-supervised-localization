@@ -1,6 +1,7 @@
 __pycache__
 */__pycache__
 */*.png
+*/*/*.png
 saved/
 test_result/
 detection/

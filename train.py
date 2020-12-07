@@ -95,7 +95,7 @@ def main(config, resume):
         fs_dataset = Dataset(
             phase='train', 
             do_augmentations=False, 
-            metafile_path='metadata/new_train_images.json')
+            metafile_path='metadata/detection_train_images.json')
         fs_data_loader = DataLoader(
             fs_dataset,
             batch_size=int(128),
@@ -221,16 +221,18 @@ def main(config, resume):
                 ## record
                 positive = ((gt_lbls == preds) + (gt_gt_lbls>2)).sum()
                 batch_acc = positive.to(torch.float)/data.shape[0]
+                fs_loss_avg.update(loss.item(), data.shape[0])
+                fs_acc_avg.update(batch_acc.item(), data.shape[0])
 
                 ## run backward pass
-                loss = loss*0.1
+                loss = loss*1.0
                 loss.backward()
                 optimizer.step() ## update
 
             # print(f"\nfew-shot: {preds}, {gt_gt_lbls}")
             ## each epoch
-            print("fs train loss: ", loss.item())
-            print("fs train acc: ", batch_acc.item())
+            print("fs train loss: ", fs_loss_avg.avg)
+            print("fs train acc: ", fs_acc_avg.avg)
 
         if val_data_loader is not None:
             log = evaluate(model.eval(), val_data_loader, device, use_conf=use_conf)

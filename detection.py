@@ -34,6 +34,8 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
             desc= f'testing',
             ):
 
+            if batch_idx % 10 != 0: continue
+
             data = batch[0].to(device)
             images = batch[-2]
             image_ids = batch[-1]
@@ -51,11 +53,12 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 min_val = torch.min(cam)
                 cam = (cam - min_val) / (max_val - min_val)
                 ## convert to heatmap image
-                cam_numpy = cam.permute(1,2,0).numpy()
                 img_numpy = images[0].permute(1,2,0).numpy()
-                for idx in range(0,N):
-                    filename = os.path.join(draw_path, f"test_{image_ids[0]}_{idx:d}")
-                    drawer.draw_heatmap(filename, cam_numpy[:,:,idx], img_numpy)
+
+                cam_total = np.concatenate(list(cam))
+                img_numpy = np.concatenate([img_numpy,img_numpy,img_numpy])
+                filename = os.path.join(draw_path, f"test_{image_ids[0]}")
+                drawer.draw_heatmap(filename, cam_total, img_numpy)
 
 
 def main(resume, use_cuda=False, use_augment=False):
