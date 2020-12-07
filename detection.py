@@ -14,8 +14,6 @@ from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, Drawer
 
-
-
 def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
 
     ## set model
@@ -23,9 +21,6 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
     model = model.to(device)
 
     fc_weights = model.head.weight.data
-    # print(fc_weights) ## [N, C]
-    # print(fc_weights.shape)
-    # input()
 
     ## loss
     criterion = nn.CrossEntropyLoss(reduction='none')
@@ -42,37 +37,19 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
             ):
 
             data = batch[0].to(device)
-            gt_lbls = batch[1].to(device)
-            gt_gt_lbls = batch[2].to(device)
             images = batch[-2]
             image_ids = batch[-1]
 
             ## run forward pass
             batch_size = data.shape[0]
             out, feat = model.forward_eval(data) ## out: [B, N]; feat: [B, C, H, W] 
-            preds = torch.max(out, dim=-1)[1]
-
-
-            ## compute loss
-            class_loss = criterion(out, gt_lbls) ## [B, 1]
-            if use_conf:
-                weights = model.compute_entropy_weight(out)
-                loss = (class_loss * (weights**2) + (1-weights)**2).mean()
-            else:
-                loss = class_loss.mean()
-
-            ## record
-            loss_avg.update(loss.item(), batch_size)
-            positive = ((gt_lbls == preds) + (gt_gt_lbls>2)).sum()
-            batch_acc = positive.to(torch.float)/batch_size
-            acc_avg.update(batch_acc.item(), batch_size)
 
             if draw_path is not None:
                 ## get cam
-                preds = torch.max(out, dim=-1)[1]
                 B,C,H,W = feat.shape
-                cam = fc_weights[preds,:].unsqueeze(-1) * feat.reshape(B, C, -1) ## [B, C] * [B, C, H, W]
-                cam = torch.sum(cam, dim=1).reshape(B, H, W)
+                N = fc_weights.shape[0]
+                cam = fc_weights.unsqueeze(-1) * feat.reshape(B, C, -1) ## [N, C, 1] * [B, C, HW]
+                cam = torch.sum(cam, dim=1).reshape(N, H, W)
                 ## normalize the cam    
                 max_val = torch.max(cam)
                 min_val = torch.min(cam)
@@ -80,17 +57,9 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 ## convert to heatmap image
                 cam_numpy = cam.permute(1,2,0).numpy()
                 img_numpy = images[0].permute(1,2,0).numpy()
-                filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item():d}_{weights.item():4.2f}")
-                drawer.draw_heatmap(filename, cam_numpy, img_numpy)
-     
-            # print(image_ids[0])
-            # print("out: ", out)
-            # print("weights: ", weights)
-            # input()
-
-    return {"loss": loss_avg.avg, "acc": acc_avg.avg}
-    # print("test loss: ", loss_avg.avg)
-
+                for idx in range(0,N):
+                    filename = os.path.join(draw_path, f"test_{image_ids[0]}_{idx:d}")
+                    drawer.draw_heatmap(filename, cam_numpy[:,:,idx], img_numpy)
 
 
 def main(resume, use_cuda=False, use_augment=False):
@@ -98,7 +67,7 @@ def main(resume, use_cuda=False, use_augment=False):
     ## path
     if True:
         timestamp = datetime.now().strftime(r"%Y-%m-%d_%H-%M-%S")
-        save_path = os.path.join('test_result', timestamp)
+        save_path = os.path.join('detection', timestamp)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
             print('make a test result folder: ', save_path)
@@ -121,12 +90,14 @@ def main(resume, use_cuda=False, use_augment=False):
     ## dataloader
     test_path = './metadata/test_images.json'
     new_test_path = './metadata/new_test_images.json'
+    detection_path = './metadata/detection_images.json'
+
     dataset = SeqDataset(
         phase='test', 
         do_augmentations=use_augment,
-        metafile_path = new_test_path)
+        metafile_path = detection_path,
+        return_gt_label=False)
 
-        
     data_loader = DataLoader(
         dataset,
         batch_size=1,

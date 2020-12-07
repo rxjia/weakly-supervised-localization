@@ -63,6 +63,7 @@ class SeqDataset(Dataset):
         self, phase='train', imwidth=224, 
         metafile_path = None,
         do_augmentations=False, img_ext='.png',
+        return_gt_label=True
         ):
         
         ## parameters
@@ -71,6 +72,7 @@ class SeqDataset(Dataset):
         self.phase = phase
         self.train = True if phase != 'test' else False
         self.do_augmentations = do_augmentations
+        self.return_gt_label = return_gt_label
 
         ## read image paths
         if metafile_path is None:
@@ -108,38 +110,14 @@ class SeqDataset(Dataset):
 
         label, path = image_path.split('/')[-2:]
         image_id = path.split('.')[0] ## str
-        assert label in self.classes
-        n = len(self.classes[label])
-        rand_idx = torch.randperm(n)[0]
-        target = self.classes[label][rand_idx]
-
-        return data, target, self.classes_str.index(label), image, image_id
-
-
-
-class BgremoveDataset(SeqDataset):
-    def __init__(
-        self, bg_image_path,
-        phase='train', imwidth=224, 
-        metafile_path = None,
-        do_augmentations=False, img_ext='.png',
-        ):
-        super(BgremoveDataset, self).__init__(
-            phase=phase, imwidth=imwidth,
-            metafile_path=metafile_path,
-            do_augmentations=do_augmentations,img_ext=img_ext)
-
-        ## load background image
-        self.bg_image = Image.open(bg_image_path)
-        self.bg_image = self.initial_transforms(self.bg_image.convert("RGB")) ## to PIL.rgb
-        self.bg_image = self.normalize(self.to_tensor(self.bg_image))
-
-    def get_background(self):
-        if hasattr(self, 'bg_image'):
-            return self.bg_image.unsqueeze(0) ## [1,3,H,W]
+        if self.return_gt_label:
+            assert label in self.classes
+            n = len(self.classes[label])
+            rand_idx = torch.randperm(n)[0]
+            target = self.classes[label][rand_idx]
+            return data, target, self.classes_str.index(label), image, image_id
         else:
-            return None
-        
+            return data, image, image_id        
 
 
 if __name__ == '__main__':

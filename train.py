@@ -8,7 +8,6 @@ import os
 from datetime import datetime
 import argparse
 from mynet import SeqDataset as Dataset
-# from mynet import BgremoveDataset as Dataset
 from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, SimpleLogger
@@ -39,7 +38,7 @@ def main(config, resume):
     batch_size = config.get('batch_size', 32)
     start_epoch = config['epoch']['start']
     max_epoch = config['epoch']['max']
-    lr = config.get('lr', 0.0001)
+    lr = config.get('lr', 0.0005)
     use_conf = config.get('use_conf', False)
 
 
@@ -108,7 +107,7 @@ def main(config, resume):
 
 
     ## CNN model
-    output_dim = 6
+    output_dim = 3
     model = MyNet(output_dim)
     model = model.to(device)
     model.train()
@@ -125,7 +124,7 @@ def main(config, resume):
     }
     optimizer = torch.optim.Adam(params, **optim_params)
     lr_params = {
-        'milestones':[],
+        'milestones':[10],
         'gamma':0.1,
     }
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,**lr_params)
@@ -267,7 +266,7 @@ if __name__ == '__main__':
                         help='the size of each minibatch')
     parser.add_argument('-g', '--n_gpu', default=None, type=int,
                         help='if given, override the numb')
-    parser.add_argument('-e', '--epoch', default=10, type=int,
+    parser.add_argument('-e', '--epoch', default=20, type=int,
                         help='if given, override the numb')
     parser.add_argument('-s', '--save_path', default='saved', type=str,
                         help='path to save')

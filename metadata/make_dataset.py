@@ -9,7 +9,7 @@ from utils import *
 
 
 
-ALLOWED_EXTENSIONS = ('.png')
+ALLOWED_EXTENSIONS = ('.jpg')
 
 def make_dataset(root):
     root = os.path.expanduser(root)
@@ -39,8 +39,8 @@ def make_dataset(root):
 
 
 if __name__ == '__main__':
-    root = '/home/yanglei/codes/WSOL/new_seq_data'
-    phase = 'few_shot_train'
+    root = '/home/yanglei/codes/WSOL/detection'
+    phase = 'detection'
     path = os.path.join(root, phase)
     image_list = make_dataset(path)
     
