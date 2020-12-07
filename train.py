@@ -91,19 +91,19 @@ def main(config, resume):
 
     ## few shot
     do_few_shot = True
-    fs_dataset = Dataset(
-        phase='train', 
-        do_augmentations=False, 
-        metafile_path='metadata/few_shot_train_images.json')
-
-    fs_data_loader = DataLoader(
-        fs_dataset,
-        batch_size=int(10),
-        num_workers=1,
-        shuffle=True,
-        pin_memory=True,
-        # **loader_kwargs,
-    )
+    if do_few_shot:
+        fs_dataset = Dataset(
+            phase='train', 
+            do_augmentations=False, 
+            metafile_path='metadata/new_train_images.json')
+        fs_data_loader = DataLoader(
+            fs_dataset,
+            batch_size=int(128),
+            num_workers=1,
+            shuffle=True,
+            pin_memory=True,
+            # **loader_kwargs,
+        )
 
 
     ## CNN model
@@ -223,14 +223,14 @@ def main(config, resume):
                 batch_acc = positive.to(torch.float)/data.shape[0]
 
                 ## run backward pass
-                loss = loss*1.0
+                loss = loss*0.1
                 loss.backward()
                 optimizer.step() ## update
 
-                print(f"\nfew-shot: {preds}, {gt_gt_lbls}")
-                ## each epoch
-                print("fs train loss: ", loss.item())
-                print("fs train acc: ", batch_acc.item())
+            # print(f"\nfew-shot: {preds}, {gt_gt_lbls}")
+            ## each epoch
+            print("fs train loss: ", loss.item())
+            print("fs train acc: ", batch_acc.item())
 
         if val_data_loader is not None:
             log = evaluate(model.eval(), val_data_loader, device, use_conf=use_conf)
@@ -241,8 +241,6 @@ def main(config, resume):
             print("val loss: ", log['loss'])
             print("val acc: ", log['acc'])
 
-        print()
-
         best_idx = logger.get_best('val_acc',best='max')
         if best_idx == epoch:
             print('save ckpt')
@@ -250,7 +248,7 @@ def main(config, resume):
             _save_checkpoint(model_path, epoch, model)
 
         lr_scheduler.step()
-
+        print()
     
     ## save final model
     _save_checkpoint(model_path, epoch, model)

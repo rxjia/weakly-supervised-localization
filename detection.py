@@ -42,7 +42,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
             batch_size = data.shape[0]
             out = model.detection(data) ## [B,N,H,W]
             N = out.shape[1]
-            print(out.shape) 
+            # print(out.shape) 
 
             if draw_path is not None:
                 cam = out[0]
@@ -86,7 +86,7 @@ def main(resume, use_cuda=False, use_augment=False):
     ## dataloader
     test_path = './metadata/test_images.json'
     new_test_path = './metadata/new_test_images.json'
-    detection_path = './metadata/detection_images.json'
+    detection_path = './metadata/detection_test_images.json'
 
     dataset = SeqDataset(
         phase='test', 

@@ -5,7 +5,7 @@ import os
 from utils import Drawer
 
 root = f'/home/yanglei/codes/WSOL/videos/'
-vid_name = 'VID_20201207_150643.mp4'
+vid_name = 'VID_20201207_150008.mp4'
 
 vid_file = os.path.join(root, vid_name)
 save_path = os.path.join(root, vid_name).split('.')[0]

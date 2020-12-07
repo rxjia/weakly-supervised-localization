@@ -9,7 +9,7 @@ from utils import *
 
 
 
-ALLOWED_EXTENSIONS = ('.jpg')
+ALLOWED_EXTENSIONS = ('.png')
 
 def make_dataset(root):
     root = os.path.expanduser(root)
@@ -39,11 +39,11 @@ def make_dataset(root):
 
 
 if __name__ == '__main__':
-    root = '/home/yanglei/codes/WSOL/detection'
-    phase = 'detection'
+    root = '/home/yanglei/codes/WSOL/new_new_seq_data'
+    phase = 'test'
     path = os.path.join(root, phase)
     image_list = make_dataset(path)
     
-    write_json_no_indent(image_list, f'{phase}_images.json')
+    write_json_no_indent(image_list, f'new_{phase}_images.json')
 
     

@@ -80,7 +80,16 @@ class SeqDataset(Dataset):
 
         files = read_json(metafile_path)
         files.sort(key=lambda x: x[5:-4])
-        self.image_paths = files
+        self.image_paths = []
+
+        if return_gt_label:
+            for fname in files:
+                if fname.split('/')[-2] in self.classes:
+                    self.image_paths.append(fname)
+        else:
+            self.image_paths = files
+        print("data set size: ", len(self.image_paths))
+
         
         ## data pre-processing
         self.normalize = transforms.Normalize(mean=[0.5084, 0.4224, 0.3769],
