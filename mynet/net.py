@@ -53,10 +53,11 @@ class MyNet(nn.Module):
         
         self.avg_pool = nn.AdaptiveAvgPool2d((1,1)) ## average pooling
         self.dropout = nn.Dropout(p=0.1)
-        self.head = nn.Linear(512, 3)
+        self.head = nn.Linear(512, output_dim)
 
         self.b = torch.ones((1, output_dim))
         self.max_ent = compute_entropy(self.b)
+
 
     def forward(self, x):
         B = x.shape[0]
@@ -65,11 +66,28 @@ class MyNet(nn.Module):
         h = self.dropout(h)
         return self.head(h)
 
+
     def forward_eval(self, x):
         B = x.shape[0]
         x = self.resnet(x)
         h = self.avg_pool(x).reshape(B, 512)
+        return self.head(h), x
         
+
+    def detection(self, x):
+        x = self.resnet(x)
+        B,C,H,W = x.shape
+        x = x.reshape(B, C, -1) ## [B, C, H, W] -> [B, C, HW]
+
+        fc_weights = self.head.weight.data ## [N, C]
+        activations = []
+        for hc in fc_weights:
+            hc = hc.reshape(1, C, 1)
+            a = (hc * x).sum(dim=1)
+            a = F.gumbel_softmax(a, dim=-1)
+            activations.append(a.reshape(B, H, W))
+        return torch.stack(activations, dim=1)
+
     def compute_entropy_weight(self, scores):
         entropy = compute_entropy(scores)
         entropy_weight = 1.0 - entropy/self.max_ent.to(scores.device)

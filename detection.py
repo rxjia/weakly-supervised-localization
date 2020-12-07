@@ -20,8 +20,6 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
     model.eval()
     model = model.to(device)
 
-    fc_weights = model.head.weight.data
-
     ## loss
     criterion = nn.CrossEntropyLoss(reduction='none')
     loss_avg = AverageMeter()
@@ -42,14 +40,12 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
 
             ## run forward pass
             batch_size = data.shape[0]
-            out, feat = model.forward_eval(data) ## out: [B, N]; feat: [B, C, H, W] 
+            out = model.detection(data) ## [B,N,H,W]
+            N = out.shape[1]
+            print(out.shape) 
 
             if draw_path is not None:
-                ## get cam
-                B,C,H,W = feat.shape
-                N = fc_weights.shape[0]
-                cam = fc_weights.unsqueeze(-1) * feat.reshape(B, C, -1) ## [N, C, 1] * [B, C, HW]
-                cam = torch.sum(cam, dim=1).reshape(N, H, W)
+                cam = out[0]
                 ## normalize the cam    
                 max_val = torch.max(cam)
                 min_val = torch.min(cam)
@@ -114,12 +110,10 @@ def main(resume, use_cuda=False, use_augment=False):
     checkpoint = torch.load(resume)
     model.load_state_dict(checkpoint['state_dict'])
 
+    print(model)
 
     ## evaluate
     log = evaluate(model, data_loader, device, draw_path=save_path, use_conf=True)
-    print("val loss: ", log['loss'])
-    print("val acc: ", log['acc'])
-
 
 
 ## main

@@ -111,6 +111,7 @@ def main(config, resume):
     model = MyNet(output_dim)
     model = model.to(device)
     model.train()
+    print(model)
 
     ## loss
     criterion = nn.CrossEntropyLoss(reduction='none')
