@@ -39,8 +39,8 @@ def make_dataset(root):
 
 
 if __name__ == '__main__':
-    root = '/home/yanglei/codes/WSOL/seq_data'
-    phase = 'new_test_no_resize'
+    root = '/home/yanglei/codes/WSOL/new_seq_data'
+    phase = 'few_shot_train'
     path = os.path.join(root, phase)
     image_list = make_dataset(path)
     

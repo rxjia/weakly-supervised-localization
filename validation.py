@@ -9,7 +9,7 @@ import numpy as np
 import os
 import argparse
 from datetime import datetime
-from mynet import SeqDataset, BgremoveDataset 
+from mynet import SeqDataset 
 from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, Drawer
@@ -80,7 +80,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 ## convert to heatmap image
                 cam_numpy = cam.permute(1,2,0).numpy()
                 img_numpy = images[0].permute(1,2,0).numpy()
-                filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item()}_{weights.item()}")
+                filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item():d}_{weights.item():4.2f}")
                 drawer.draw_heatmap(filename, cam_numpy, img_numpy)
      
             # print(image_ids[0])
@@ -119,18 +119,12 @@ def main(resume, use_cuda=False, use_augment=False, remove_bg=False):
 
 
     ## dataloader
-    if remove_bg:
-        bg_image_path = '/home/yanglei/codes/WSOL/new_seq_data/background.png'
-        dataset = BgremoveDataset(
-            phase='test', 
-            bg_image_path=bg_image_path, 
-            do_augmentations=use_augment,
-            metafile_path = './metadata/new_test_no_resize_images.json')
-    else:
-        dataset = SeqDataset(
-            phase='test', 
-            do_augmentations=use_augment,
-            metafile_path = './metadata/test_images.json')
+    test_path = './metadata/test_images.json'
+    new_test_path = './metadata/new_test_images.json'
+    dataset = SeqDataset(
+        phase='test', 
+        do_augmentations=use_augment,
+        metafile_path = new_test_path)
 
         
     data_loader = DataLoader(

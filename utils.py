@@ -128,7 +128,7 @@ class Drawer:
                 img = cv2.imread(os.path.join(pathIn, filename))
                 height, width, layers = img.shape
                 size = (width, height)
-                text = filename[-8:]
+                text = filename[-16:]
                 Drawer.write_text_to_img(img, text)
                 frame_array.append(img)
             

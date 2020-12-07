@@ -135,7 +135,10 @@ class BgremoveDataset(SeqDataset):
         self.bg_image = self.normalize(self.to_tensor(self.bg_image))
 
     def get_background(self):
-        return self.bg_image
+        if hasattr(self, 'bg_image'):
+            return self.bg_image.unsqueeze(0) ## [1,3,H,W]
+        else:
+            return None
         
 
 

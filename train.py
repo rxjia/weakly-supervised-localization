@@ -7,8 +7,8 @@ import torch.nn.functional as F
 import os
 from datetime import datetime
 import argparse
-# from mynet import SeqDataset as Dataset
-from mynet import BgremoveDataset as Dataset
+from mynet import SeqDataset as Dataset
+# from mynet import BgremoveDataset as Dataset
 from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, SimpleLogger
@@ -67,8 +67,7 @@ def main(config, resume):
         device = torch.device("cuda:0")
     
     ## dataloader
-    bg_image_path = '/home/yanglei/codes/WSOL/seq_data/background.png'
-    dataset = Dataset(phase='train', bg_image_path=bg_image_path, do_augmentations=False)
+    dataset = Dataset(phase='train', do_augmentations=False)
     data_loader = DataLoader(
         dataset,
         batch_size=int(batch_size),
@@ -79,13 +78,30 @@ def main(config, resume):
         # **loader_kwargs,
     )
 
-    val_dataset = Dataset(phase='val', bg_image_path=bg_image_path, do_augmentations=False)
+    val_dataset = Dataset(phase='val', do_augmentations=False)
     val_data_loader = DataLoader(
         val_dataset,
         batch_size=int(batch_size),
         num_workers=1,
         shuffle=True,
         drop_last=True,
+        pin_memory=True,
+        # **loader_kwargs,
+    )
+
+
+    ## few shot
+    do_few_shot = True
+    fs_dataset = Dataset(
+        phase='train', 
+        do_augmentations=False, 
+        metafile_path='metadata/few_shot_train_images.json')
+
+    fs_data_loader = DataLoader(
+        fs_dataset,
+        batch_size=int(10),
+        num_workers=1,
+        shuffle=True,
         pin_memory=True,
         # **loader_kwargs,
     )
@@ -116,10 +132,12 @@ def main(config, resume):
 
     loss_avg = AverageMeter()
     acc_avg = AverageMeter()
+    fs_loss_avg = AverageMeter()
+    fs_acc_avg = AverageMeter()
     logger = SimpleLogger(['train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
+
     ## loop
-    remove_bg = hasattr(dataset, 'bg_image_path')
     for epoch in range(start_epoch, max_epoch):
         loss_avg.reset()
 
@@ -137,10 +155,7 @@ def main(config, resume):
             optimizer.zero_grad()
 
             ## run forward pass
-            if remove_bg:
-                out = model.forward_with_bg(data, bg) ## logits: [B, NC]; conf: [B, 1] 
-            else:
-                out = model(data) ## logits: [B, NC]; conf: [B, 1] 
+            out = model(data) ## logits: [B, NC]; conf: [B, 1] 
             preds = torch.max(out, dim=-1)[1]
             # print("out shape: ", out.shape)
             
@@ -166,19 +181,66 @@ def main(config, resume):
             loss.backward()
             optimizer.step() ## update
 
+        ## each epoch
+        logger.update(loss_avg.avg, 'train_loss')
+        logger.update(acc_avg.avg, 'train_acc')
+        print("train loss: ", loss_avg.avg)
+        print("train acc: ", acc_avg.avg)
+
+        if do_few_shot and fs_data_loader is not None:
+            for batch_idx, batch in tqdm(
+                enumerate(fs_data_loader), 
+                total=len(fs_data_loader),
+                ncols = 80,
+                desc= f'training epoch {epoch}',
+                ):
+                data = batch[0].to(device)
+                gt_lbls = batch[1].to(device)
+                gt_gt_lbls = batch[2].to(device)
+                
+                ## set zerograd
+                optimizer.zero_grad()
+
+                ## run forward pass
+                out = model(data) ## logits: [B, NC]; conf: [B, 1] 
+                preds = torch.max(out, dim=-1)[1]
+                # print("out shape: ", out.shape)
+                
+                weights = model.compute_entropy_weight(out)
+                # print("weights shape: ", weights.shape)
+
+                ## compute loss
+                class_loss = criterion(out, gt_lbls) ## [B, 1]
+                # print("class_loss shape: ", class_loss.shape)
+
+                if use_conf:
+                    loss = (class_loss * (weights**2) + (1-weights)**2).mean()
+                else:
+                    loss = class_loss.mean()
+
+                ## record
+                positive = ((gt_lbls == preds) + (gt_gt_lbls>2)).sum()
+                batch_acc = positive.to(torch.float)/data.shape[0]
+
+                ## run backward pass
+                loss = loss*1.0
+                loss.backward()
+                optimizer.step() ## update
+
+                print(f"\nfew-shot: {preds}, {gt_gt_lbls}")
+                ## each epoch
+                print("fs train loss: ", loss.item())
+                print("fs train acc: ", batch_acc.item())
+
         if val_data_loader is not None:
             log = evaluate(model.eval(), val_data_loader, device, use_conf=use_conf)
             model.train()
 
-        ## each epoch
-        logger.update(loss_avg.avg, 'train_loss')
-        logger.update(acc_avg.avg, 'train_acc')
-        logger.update(log['loss'], 'val_loss')
-        logger.update(log['acc'], 'val_acc')
-        print("train loss: ", loss_avg.avg)
-        print("train acc: ", acc_avg.avg)
-        print("val loss: ", log['loss'])
-        print("val acc: ", log['acc'])
+            logger.update(log['loss'], 'val_loss')
+            logger.update(log['acc'], 'val_acc')
+            print("val loss: ", log['loss'])
+            print("val acc: ", log['acc'])
+
         print()
 
         best_idx = logger.get_best('val_acc',best='max')
@@ -188,6 +250,11 @@ def main(config, resume):
             _save_checkpoint(model_path, epoch, model)
 
         lr_scheduler.step()
+
+    
+    ## save final model
+    _save_checkpoint(model_path, epoch, model)
+    
 
 
 
