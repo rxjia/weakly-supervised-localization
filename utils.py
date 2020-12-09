@@ -101,15 +101,45 @@ class Drawer:
                     lineType)
         return img
 
+
     @staticmethod
-    def draw_heatmap(path, data, src):
+    def draw_heatmap(data, src, path=None):
         reshape_size = src.shape
         data = Drawer.resize_image(data, (reshape_size[1],reshape_size[0]))
         heatmap = Drawer.normalize_data_to_img255(data)
         heatmap = cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR)
         heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
         img = 0.5*src + 0.3*heatmap
-        Drawer.cv_write_numpy_to_image(img, path)
+        if path is None:
+            return img
+        else:
+            Drawer.cv_write_numpy_to_image(img, path)
+
+
+
+    @staticmethod
+    def draw_boxes_on_image(boxes, data, cids, path=None):
+        """
+        data: numpy array
+        boxes: list of size [N, [4]]; or numpy array of shape [N, 4]
+        """
+        print("IN DRAWING ", boxes.shape)
+        colors = [(0,0,255), (0,255,0), (255,0,0)]
+        thickness = 2
+        ## convert to cv.UMat
+        img = cv2.cvtColor(data, cv2.COLOR_RGB2BGR) 
+        for idx, box in zip(cids, boxes):
+            tl = box[:2]
+            br = box[2:]
+            img = cv2.rectangle(img, tuple(tl), tuple(br), colors[idx], thickness)
+        
+        print("drawing done")
+        print(img.shape)
+        if path is None:
+            return img
+        else:
+            Drawer.cv_write_numpy_to_image(img, path)
+
         
     @staticmethod
     def write_video_from_images(pathIn, videoName, deleteImg=True):

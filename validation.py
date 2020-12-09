@@ -81,7 +81,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 cam_numpy = cam.permute(1,2,0).numpy()
                 img_numpy = images[0].permute(1,2,0).numpy()
                 filename = os.path.join(draw_path, f"test_{image_ids[0]}_{preds.item():d}_{weights.item():4.2f}")
-                drawer.draw_heatmap(filename, cam_numpy, img_numpy)
+                drawer.draw_heatmap(cam_numpy, img_numpy, filename)
      
             # print(image_ids[0])
             # print("out: ", out)

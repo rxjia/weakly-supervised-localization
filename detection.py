@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F 
 import numpy as np
-
+import scipy
 
 import os
 import argparse
@@ -13,6 +13,31 @@ from mynet import SeqDataset
 from mynet import MyNet
 from torch.utils.data import DataLoader
 from utils import AverageMeter, Drawer
+from selective_search import customized_selective_search as ss_box_finder
+
+
+BOX_SCORE_THRESHOLD =0.1
+
+def box_cam_intersection(boxes, cams, scale_wh):
+    scale_wh = (1, *scale_wh)
+    cams_reshape = scipy.ndimage.zoom(cams, scale_wh) ## [3, 224, 398]
+    boxes= np.array(boxes) ## [N, 4]
+    def generate_mask(boxes, shape):
+        shape = (boxes.shape[0], *shape)
+        tmp = np.zeros(shape)
+        for idx, box in enumerate(boxes):
+            tmp[idx, box[1]:box[3], box[0]:box[2]] = 1
+        return tmp
+
+    H, W = cams_reshape.shape[1:]
+    masks = generate_mask(boxes, (H, W)) ## [N, H, W] X [C, H, W]
+    box_areas = (boxes[:,3]-boxes[:,1]) * (boxes[:,2]-boxes[:,0])
+    scores = masks.reshape(-1,1,H,W) * cams_reshape.reshape(1,-1,H,W)
+    scores = scores.sum(axis=(2,3)) / box_areas.reshape(-1,1)
+    max_vals = np.amax(scores,axis=-1)
+    max_idxs = np.argmax(scores,axis=-1)
+    return max_vals, max_idxs
+
 
 def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
 
@@ -34,7 +59,7 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
             desc= f'testing',
             ):
 
-            if batch_idx % 10 != 0: continue
+            # if batch_idx == 20: break
 
             data = batch[0].to(device)
             images = batch[-2]
@@ -54,11 +79,16 @@ def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
                 cam = (cam - min_val) / (max_val - min_val)
                 ## convert to heatmap image
                 img_numpy = images[0].permute(1,2,0).numpy()
+                boxes = np.array(ss_box_finder(img_numpy)).squeeze()
+                scores, classes = box_cam_intersection(boxes, cam.numpy(), (32,30.6))
+
+                img_numpy = Drawer.draw_boxes_on_image(boxes[scores>BOX_SCORE_THRESHOLD], img_numpy, classes[scores>BOX_SCORE_THRESHOLD])
 
                 cam_total = np.concatenate(list(cam))
                 img_numpy = np.concatenate([img_numpy,img_numpy,img_numpy])
                 filename = os.path.join(draw_path, f"test_{image_ids[0]}")
-                drawer.draw_heatmap(filename, cam_total, img_numpy)
+                drawer.draw_heatmap(cam_total, img_numpy, filename)
+                # input()
 
 
 def main(resume, use_cuda=False, use_augment=False):
@@ -104,7 +134,6 @@ def main(resume, use_cuda=False, use_augment=False):
         shuffle=False,
         pin_memory=True,
     )
-
 
     ## CNN model
     output_dim = 3
