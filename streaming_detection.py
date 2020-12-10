@@ -9,12 +9,10 @@ import scipy
 import os
 import argparse
 from datetime import datetime
-from mynet import SeqDataset 
+from mynet import StreamingDataloader 
 from mynet import MyNet
-from torch.utils.data import DataLoader
-from utils import AverageMeter, Drawer
+from utils import Drawer
 from selective_search import customized_selective_search as ss_box_finder
-
 
 BOX_SCORE_THRESHOLD =0.1
 
@@ -39,56 +37,43 @@ def box_cam_intersection(boxes, cams, scale_wh):
     return max_vals, max_idxs
 
 
-def evaluate(model, data_loader, device, draw_path=None, use_conf=False):
+class Detector(object):
 
-    ## set model
-    model.eval()
-    model = model.to(device)
+    def __init__(self, model, data_loader, device):
+        self.model = model
+        self.data_loader = data_loader
+        self.device = device
 
-    ## loss
-    criterion = nn.CrossEntropyLoss(reduction='none')
-    loss_avg = AverageMeter()
-    acc_avg = AverageMeter()
-    drawer = Drawer()
-
-    with torch.no_grad():
-        for batch_idx, batch in tqdm(
-            enumerate(data_loader), 
-            total=len(data_loader),
-            ncols = 80,
-            desc= f'testing',
-            ):
-
-            # if batch_idx == 20: break
-
-            data = batch[0].to(device)
-            images = batch[-2]
-            image_ids = batch[-1]
-
+    def __call__(self, image_path, draw_path):
+        with torch.no_grad():
+            batch = self.data_loader(image_path)
+            data = batch[0].to(self.device)
+            image = batch[-1]
+            
             ## run forward pass
-            batch_size = data.shape[0]
-            out = model.detection(data) ## [B,N,H,W]
+            out = self.model.detection(data.unsqueeze(0)) ## [B,N,H,W]
             N = out.shape[1]
             # print(out.shape) 
 
             if draw_path is not None:
-                filename = os.path.join(draw_path, f"test_{image_ids[0]}")
+                image_name = image_path.split('/')[-1]
+                image_name = image_name.split('.')[0]
+                filename = os.path.join(draw_path, f"detection_{image_name}")
                 cam = out[0]
+                
                 ## normalize the cam    
                 max_val = torch.max(cam)
                 min_val = torch.min(cam)
                 cam = (cam - min_val) / (max_val - min_val)
-                ## convert to heatmap image
-                img_numpy = images[0].permute(1,2,0).numpy()
+                
+                ## find intersected boxes
+                img_numpy = image.permute(1,2,0).numpy()
                 boxes = np.array(ss_box_finder(img_numpy)).squeeze()
                 scores, classes = box_cam_intersection(boxes, cam.numpy(), (32,30.6))
 
+                ## draw image
                 img_numpy = Drawer.draw_boxes_on_image(boxes[scores>BOX_SCORE_THRESHOLD], img_numpy, classes[scores>BOX_SCORE_THRESHOLD], filename)
 
-                # cam_total = np.concatenate(list(cam))
-                # img_numpy = np.concatenate([img_numpy,img_numpy,img_numpy])
-                # drawer.draw_heatmap(cam_total, img_numpy, filename)
-                # input()
 
 
 def main(resume, use_cuda=False, use_augment=False):
@@ -103,7 +88,6 @@ def main(resume, use_cuda=False, use_augment=False):
     else:
         save_path = None
 
-
     ## cuda or cpu
     if use_cuda:
         device = torch.device("cuda:0")
@@ -115,25 +99,8 @@ def main(resume, use_cuda=False, use_augment=False):
     if use_augment: 
         print("data are augmented randomly")
 
-
     ## dataloader
-    test_path = './metadata/test_images.json'
-    new_test_path = './metadata/new_test_images.json'
-    detection_path = './metadata/detection_test_images.json'
-
-    dataset = SeqDataset(
-        phase='test', 
-        do_augmentations=use_augment,
-        metafile_path = detection_path,
-        return_gt_label=False)
-
-    data_loader = DataLoader(
-        dataset,
-        batch_size=1,
-        num_workers=1,
-        shuffle=False,
-        pin_memory=True,
-    )
+    data_loader = StreamingDataloader(imwidth=224)
 
     ## CNN model
     output_dim = 3
@@ -141,12 +108,21 @@ def main(resume, use_cuda=False, use_augment=False):
     ## resume a ckpt
     checkpoint = torch.load(resume)
     model.load_state_dict(checkpoint['state_dict'])
-
+    model.eval()
+    model = model.to(device)
     print(model)
 
-    ## evaluate
-    log = evaluate(model, data_loader, device, draw_path=save_path, use_conf=True)
-
+    ## init a detector
+    detector = Detector(model, data_loader, device)
+    
+    ## perform detection
+    """
+    real-time feeding the image path to the detector
+    """
+    data_folder = '/home/yanglei/codes/WSOL/detection/small_test'
+    image_path = os.path.join(data_folder, 'new_test0000.png')
+    detector(image_path, draw_path=save_path)
+    
 
 ## main
 if __name__ == '__main__':
